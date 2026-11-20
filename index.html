@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101415">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Причуды · Бизнес">
+  <meta name="description" content="Личный калькулятор себестоимости, цен и предложений подрядчиков для Причуд. Данные сохраняются на вашем устройстве.">
+  <title>Причуды · Мой бизнес</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./style.css">
+  <script>
+    if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('standalone');
+    window.appOfflineReady = false;
+    window.appCacheFailed = false;
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      let previousController = navigator.serviceWorker.controller;
+      function updateReady() { window.appUpdatePending = true; window.dispatchEvent(new Event('app-update')); }
+      function cacheFailed() { window.appCacheFailed = true; window.dispatchEvent(new Event('app-cache-failed')); }
+      const watchedWorkers = new WeakSet();
+      function watchInstallation(worker) {
+        if (!worker || watchedWorkers.has(worker)) return;
+        watchedWorkers.add(worker);
+        let activated = worker.state === 'activated';
+        function checkState() {
+          if (worker.state === 'activated') {
+            activated = true;
+            if (window.appOfflineReady && window.appCacheFailed) {
+              window.appCacheFailed = false;
+              window.dispatchEvent(new Event('app-offline-ready'));
+            }
+          }
+          // An old active worker also becomes redundant during a normal update.
+          // Only an installation that never activated indicates a failed shell cache.
+          if (worker.state === 'redundant' && !activated) cacheFailed();
+        }
+        worker.addEventListener('statechange', checkState);
+        checkState();
+      }
+      navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'APP_UPDATED') updateReady(); });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (previousController && previousController.scriptURL === navigator.serviceWorker.controller?.scriptURL) updateReady();
+        previousController = navigator.serviceWorker.controller;
+      });
+      navigator.serviceWorker.register('./sw.js', {scope:'./'}).then(reg => {
+        watchInstallation(reg.installing);
+        watchInstallation(reg.waiting);
+        reg.addEventListener('updatefound', () => watchInstallation(reg.installing));
+        navigator.serviceWorker.ready.then(() => {
+          window.appOfflineReady = true;
+          window.appCacheFailed = false;
+          window.dispatchEvent(new Event('app-offline-ready'));
+        }).catch(cacheFailed);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+        setInterval(() => reg.update().catch(() => {}), 3600000);
+      }).catch(cacheFailed);
+    }
+  </script>
+</head>
+<body>
+  <div id="app"><div class="loading"><span class="brand-mark">П</span><p>Открываем ваш бизнес…</p></div></div>
+  <noscript>Для расчётов включите JavaScript в браузере. Все вычисления выполняются на вашем устройстве.</noscript>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
